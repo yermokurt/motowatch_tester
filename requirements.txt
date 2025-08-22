@@ -1,4 +1,9 @@
-gradio==3.39.0
+gradio
 torch
-ultralytics==8.3.40
+torchvision
+torchaudio
+ultralytics
 numpy
+opencv-python-headless
+google-generativeai
+python-dotenv
