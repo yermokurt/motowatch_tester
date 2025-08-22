@@ -7,10 +7,8 @@ from PIL import Image
 import requests
 import json
 
-# Initialize YOLO model
 model = YOLO("best.pt")
 
-# Gemini API Configuration
 GEMINI_API_KEY = "AIzaSyCBs4TumAonKI0AodIzbl4b8Vmu9eM_r9I"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
@@ -62,7 +60,6 @@ def yoloV8_func(image=None, image_size=640, conf_threshold=0.4, iou_threshold=0.
     
     imgsz = [image_size, image_size]
 
-    # Make predictions
     results = model.predict(
         source=image,
         conf=conf_threshold,
@@ -71,7 +68,6 @@ def yoloV8_func(image=None, image_size=640, conf_threshold=0.4, iou_threshold=0.
         verbose=False
     )
     
-    # Get detection statistics
     boxes = results[0].boxes.xyxy.cpu().numpy()
     class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
     
@@ -87,16 +83,13 @@ def yoloV8_func(image=None, image_size=640, conf_threshold=0.4, iou_threshold=0.
         'total_riders': total_riders
     }
     
-    # Get safety analysis
     safety_analysis = get_safety_analysis(stats)
     print("\nSafety Analysis:", safety_analysis)
     
-    # Get the output image with bounding boxes
     annotated_image = results[0].plot()
     
     return annotated_image
 
-# Define Gradio interface components
 inputs = [
     gr.Image(type="filepath", label="Input Image"),
     gr.Slider(minimum=320, maximum=1280, value=640, step=32, label="Image Size"),
@@ -106,7 +99,6 @@ inputs = [
 
 outputs = gr.Image(type="pil", label="Output Image")
 
-# Set up Gradio interface
 title = "YOLOv11 Motorcyclist Helmet Detection"
 description = """
     This application uses YOLOv11 to detect Motorcyclists with and without Helmets in images. 
