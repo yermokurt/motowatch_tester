@@ -97,12 +97,43 @@ def yoloV8_func(image=None, image_size=640, conf_threshold=0.4, iou_threshold=0.
     
     return annotated_image
 
-inputs = [
-    gr.Image(type="filepath", label="Input Image"),
-    gr.Slider(minimum=320, maximum=1280, value=640, step=32, label="Image Size"),
-    gr.Slider(minimum=0.0, maximum=1.0, value=0.4, step=0.05, label="Confidence Threshold"),
-    gr.Slider(minimum=0.0, maximum=1.0, value=0.5, step=0.05, label="IOU Threshold")
-]
+with gr.Blocks() as demo:
+    with gr.Row():
+        image_input = gr.Image(type="filepath", label="Input Image")
+        output_image = gr.Image(type="pil", label="Output Image")
+    
+    with gr.Row():
+        image_size = gr.Slider(
+            minimum=320, 
+            maximum=1280, 
+            value=640, 
+            step=32, 
+            label="Image Size",
+            interactive=True
+        )
+        conf_threshold = gr.Slider(
+            minimum=0.1, 
+            maximum=1.0, 
+            value=0.4, 
+            step=0.05, 
+            label="Confidence Threshold",
+            interactive=True
+        )
+        iou_threshold = gr.Slider(
+            minimum=0.1, 
+            maximum=1.0, 
+            value=0.5, 
+            step=0.05, 
+            label="IOU Threshold",
+            interactive=True
+        )
+    
+    process_btn = gr.Button("Process Image")
+    process_btn.click(
+        fn=yoloV8_func,
+        inputs=[image_input, image_size, conf_threshold, iou_threshold],
+        outputs=output_image
+    )
 
 outputs = gr.Image(type="pil", label="Output Image")
 
@@ -119,16 +150,5 @@ article = """
     <p>Upload your images and try it out!</p>
 """
 
-yolo_app = gr.Interface(
-    fn=yoloV8_func,
-    inputs=inputs,
-    outputs=outputs,
-    title=title,
-    description=description,
-    article=article,
-    examples=[["sample_1.jpg"], ["sample_2.jpg"], ["sample_3.jpg"], ["sample_4.jpg"], ["sample_5.jpg"]],
-    cache_examples=True,
-)
-
 if __name__ == "__main__":
-    yolo_app.launch(debug=True)
+    demo.launch(debug=True)
