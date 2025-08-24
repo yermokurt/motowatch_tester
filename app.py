@@ -23,33 +23,28 @@ model = YOLO("best.pt")
 class_names = {0: 'With Helmet', 1: 'Without Helmet', 2: 'License Plate'}
 
 def crop_license_plates(image, detections):
-    """Crop license plates from the image based on detections"""
     cropped_plates = []
     
-    if isinstance(image, str):  # If image is a file path
+    if isinstance(image, str):
         image = Image.open(image)
-    elif isinstance(image, np.ndarray):  # If image is numpy array
+    elif isinstance(image, np.ndarray):
         image = Image.fromarray(image)
     
     for detection in detections:
         if detection['Object'] == 'License Plate':
-            # Parse coordinates from position string
             pos = detection['Position'].strip('()')
             x1, y1 = map(int, pos.split(', '))
             
-            # Parse dimensions
             dims = detection['Dimensions']
             width, height = map(int, dims.split('x'))
             x2, y2 = x1 + width, y1 + height
             
-            # Add some padding around the license plate
             padding = 10
             x1 = max(0, x1 - padding)
             y1 = max(0, y1 - padding)
             x2 = min(image.width, x2 + padding)
             y2 = min(image.height, y2 + padding)
             
-            # Crop the license plate
             cropped_plate = image.crop((x1, y1, x2, y2))
             cropped_plates.append({
                 'image': cropped_plate,
@@ -60,31 +55,25 @@ def crop_license_plates(image, detections):
     return cropped_plates
 
 def create_download_files(annotated_image, cropped_plates, detections):
-    """Create downloadable files including annotated image and cropped plates"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Create a temporary directory for files
-    os.makedirs("temp_downloads", exist_ok=True)
+    os.makedirs("temp", exist_ok=True)
     
-    # Save annotated image
-    annotated_path = f"temp_downloads/annotated_image_{timestamp}.jpg"
+    annotated_path = f"temp/annotated_image_{timestamp}.jpg"
     annotated_image.save(annotated_path)
     
-    # Save cropped license plates
     plate_paths = []
     for i, plate_data in enumerate(cropped_plates):
-        plate_path = f"temp_downloads/license_plate_{i+1}_{timestamp}.jpg"
+        plate_path = f"temp/license_plate_{i+1}_{timestamp}.jpg"
         plate_data['image'].save(plate_path)
         plate_paths.append(plate_path)
     
-    # Create detection report
-    report_path = f"temp_downloads/detection_report_{timestamp}.csv"
+    report_path = f"temp/detection_report_{timestamp}.csv"
     if detections:
         df = pd.DataFrame(detections)
         df.to_csv(report_path, index=False)
     
-    # Create zip file with all results
-    zip_path = f"temp_downloads/detection_results_{timestamp}.zip"
+    zip_path = f"temp/detection_results_{timestamp}.zip"
     with zipfile.ZipFile(zip_path, 'w') as zipf:
         zipf.write(annotated_path, f"annotated_image_{timestamp}.jpg")
         for plate_path in plate_paths:
@@ -151,7 +140,6 @@ def yoloV8_func(
         cropped_plates = crop_license_plates(image, detections)
         license_plate_gallery = [plate_data['image'] for plate_data in cropped_plates]
         
-        # Create download files
         if cropped_plates or detections:
             try:
                 download_files, _, _ = create_download_files(annotated_image, cropped_plates, detections)
@@ -168,7 +156,6 @@ def yoloV8_func(
         for obj, count in counts.items():
             stats_text += f"- {obj}: {count}\n"
         
-        # Add license plate info
         if cropped_plates:
             stats_text += f"\nLicense Plates Cropped: {len(cropped_plates)}\n"
     
@@ -180,16 +167,13 @@ def yoloV8_func(
         except:
             font = ImageFont.load_default()
         
-        # Add semi-transparent background for text
         text_bbox = draw.textbbox((0, 0), stats_text, font=font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
         draw.rectangle([10, 10, 20 + text_width, 20 + text_height], fill=(0, 0, 0, 128))
         
-        # Add text
         draw.text((15, 15), stats_text, font=font, fill=(255, 255, 255))
     
-    # Create a detection table for display
     detection_table = pd.DataFrame(detections) if detections else pd.DataFrame(columns=["Object", "Confidence", "Position", "Dimensions"])
     
     return annotated_image, detection_table, stats_text, license_plate_gallery, download_files
