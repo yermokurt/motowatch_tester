@@ -23,137 +23,76 @@ model = YOLO("best.pt")
 class_names = {0: 'With Helmet', 1: 'Without Helmet', 2: 'License Plate'}
 
 def crop_license_plates(image, detections):
+    """Crop license plates from the image based on detections"""
     cropped_plates = []
     
-    try:
-        if isinstance(image, str):
-            if not os.path.exists(image):
-                print(f"Error: Image file not found: {image}")
-                return cropped_plates
-            image = Image.open(image)
-        elif isinstance(image, np.ndarray):
-            image = Image.fromarray(image)
-        elif not isinstance(image, Image.Image):
-            print(f"Error: Unsupported image type: {type(image)}")
-            return cropped_plates
-        
-        if image.size[0] == 0 or image.size[1] == 0:
-            print("Error: Image has zero dimensions")
-            return cropped_plates
-            
-    except Exception as e:
-        print(f"Error loading image: {e}")
-        return cropped_plates
+    if isinstance(image, str):  # If image is a file path
+        image = Image.open(image)
+    elif isinstance(image, np.ndarray):  # If image is numpy array
+        image = Image.fromarray(image)
     
-    for i, detection in enumerate(detections):
-        try:
-            if detection['Object'] != 'License Plate':
-                continue
-                
-            pos_str = detection['Position'].strip('()')
-            if ',' not in pos_str:
-                print(f"Error: Invalid position format for detection {i}: {detection['Position']}")
-                continue
-                
-            x1, y1 = map(int, pos_str.split(', '))
+    for detection in detections:
+        if detection['Object'] == 'License Plate':
+            # Parse coordinates from position string
+            pos = detection['Position'].strip('()')
+            x1, y1 = map(int, pos.split(', '))
             
-            dims_str = detection['Dimensions']
-            if 'x' not in dims_str:
-                print(f"Error: Invalid dimensions format for detection {i}: {detection['Dimensions']}")
-                continue
-                
-            width, height = map(int, dims_str.split('x'))
-            
-            if width <= 0 or height <= 0:
-                print(f"Error: Invalid dimensions for detection {i}: {width}x{height}")
-                continue
-            
+            # Parse dimensions
+            dims = detection['Dimensions']
+            width, height = map(int, dims.split('x'))
             x2, y2 = x1 + width, y1 + height
             
-            if x1 < 0 or y1 < 0 or x2 > image.width or y2 > image.height:
-                print(f"Warning: Bounding box extends beyond image boundaries for detection {i}")
-                x1 = max(0, x1)
-                y1 = max(0, y1)
-                x2 = min(image.width, x2)
-                y2 = min(image.height, y2)
+            # Add some padding around the license plate
+            padding = 10
+            x1 = max(0, x1 - padding)
+            y1 = max(0, y1 - padding)
+            x2 = min(image.width, x2 + padding)
+            y2 = min(image.height, y2 + padding)
             
-            if x2 <= x1 or y2 <= y1:
-                print(f"Error: Invalid crop coordinates for detection {i}: ({x1},{y1}) to ({x2},{y2})")
-                continue
-            
+            # Crop the license plate
             cropped_plate = image.crop((x1, y1, x2, y2))
-            
-            if cropped_plate.size[0] == 0 or cropped_plate.size[1] == 0:
-                print(f"Error: Cropped image has zero dimensions for detection {i}")
-                continue
-            
             cropped_plates.append({
                 'image': cropped_plate,
                 'confidence': detection['Confidence'],
-                'position': detection['Position'],
-                'crop_coords': f"({x1},{y1}) to ({x2},{y2})"
+                'position': detection['Position']
             })
-            
-        except ValueError as e:
-            print(f"Error parsing coordinates for detection {i}: {e}")
-            continue
-        except Exception as e:
-            print(f"Error cropping license plate {i}: {e}")
-            continue
     
     return cropped_plates
 
 def create_download_files(annotated_image, cropped_plates, detections):
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        os.makedirs("temp", exist_ok=True)
-        
-        annotated_path = f"temp/annotated_image_{timestamp}.jpg"
-        try:
-            annotated_image.save(annotated_path, quality=95)
-        except Exception as e:
-            print(f"Error saving annotated image: {e}")
-            return None, None, []
-        
-        plate_paths = []
-        for i, plate_data in enumerate(cropped_plates):
-            try:
-                plate_path = f"temp/license_plate_{i+1}_{timestamp}.jpg"
-                plate_data['image'].save(plate_path, quality=95)
-                plate_paths.append(plate_path)
-            except Exception as e:
-                print(f"Error saving license plate {i+1}: {e}")
-                continue
-        
-        report_path = f"temp/detection_report_{timestamp}.csv"
-        if detections:
-            try:
-                df = pd.DataFrame(detections)
-                df.to_csv(report_path, index=False)
-            except Exception as e:
-                print(f"Error creating detection report: {e}")
-                report_path = None
-        
-        zip_path = f"temp/detection_results_{timestamp}.zip"
-        try:
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                if os.path.exists(annotated_path):
-                    zipf.write(annotated_path, f"annotated_image_{timestamp}.jpg")
-                for plate_path in plate_paths:
-                    if os.path.exists(plate_path):
-                        zipf.write(plate_path, os.path.basename(plate_path))
-                if report_path and os.path.exists(report_path):
-                    zipf.write(report_path, f"detection_report_{timestamp}.csv")
-        except Exception as e:
-            print(f"Error creating ZIP file: {e}")
-            return None, annotated_path, plate_paths
-        
-        return zip_path, annotated_path, plate_paths
-        
-    except Exception as e:
-        print(f"Error in create_download_files: {e}")
-        return None, None, []
+    """Create downloadable files including annotated image and cropped plates"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Create a temporary directory for files
+    os.makedirs("temp_downloads", exist_ok=True)
+    
+    # Save annotated image
+    annotated_path = f"temp_downloads/annotated_image_{timestamp}.jpg"
+    annotated_image.save(annotated_path)
+    
+    # Save cropped license plates
+    plate_paths = []
+    for i, plate_data in enumerate(cropped_plates):
+        plate_path = f"temp_downloads/license_plate_{i+1}_{timestamp}.jpg"
+        plate_data['image'].save(plate_path)
+        plate_paths.append(plate_path)
+    
+    # Create detection report
+    report_path = f"temp_downloads/detection_report_{timestamp}.csv"
+    if detections:
+        df = pd.DataFrame(detections)
+        df.to_csv(report_path, index=False)
+    
+    # Create zip file with all results
+    zip_path = f"temp_downloads/detection_results_{timestamp}.zip"
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        zipf.write(annotated_path, f"annotated_image_{timestamp}.jpg")
+        for plate_path in plate_paths:
+            zipf.write(plate_path, os.path.basename(plate_path))
+        if os.path.exists(report_path):
+            zipf.write(report_path, f"detection_report_{timestamp}.csv")
+    
+    return zip_path, annotated_path, plate_paths
 
 def yoloV8_func(
     image=None, 
@@ -209,19 +148,16 @@ def yoloV8_func(
     download_files = None
     
     if crop_plates and detections:
-        try:
-            cropped_plates = crop_license_plates(image, detections)
-            license_plate_gallery = [plate_data['image'] for plate_data in cropped_plates]
-            
-            if cropped_plates or detections:
+        cropped_plates = crop_license_plates(image, detections)
+        license_plate_gallery = [plate_data['image'] for plate_data in cropped_plates]
+        
+        # Create download files
+        if cropped_plates or detections:
+            try:
                 download_files, _, _ = create_download_files(annotated_image, cropped_plates, detections)
-                if download_files is None:
-                    print("Warning: Could not create download files")
-        except Exception as e:
-            print(f"Error in license plate processing: {e}")
-            cropped_plates = []
-            license_plate_gallery = []
-            download_files = None
+            except Exception as e:
+                print(f"Error creating download files: {e}")
+                download_files = None
     
     # Create stats text
     stats_text = ""
@@ -232,6 +168,7 @@ def yoloV8_func(
         for obj, count in counts.items():
             stats_text += f"- {obj}: {count}\n"
         
+        # Add license plate info
         if cropped_plates:
             stats_text += f"\nLicense Plates Cropped: {len(cropped_plates)}\n"
     
@@ -243,13 +180,16 @@ def yoloV8_func(
         except:
             font = ImageFont.load_default()
         
+        # Add semi-transparent background for text
         text_bbox = draw.textbbox((0, 0), stats_text, font=font)
         text_width = text_bbox[2] - text_bbox[0]
         text_height = text_bbox[3] - text_bbox[1]
         draw.rectangle([10, 10, 20 + text_width, 20 + text_height], fill=(0, 0, 0, 128))
         
+        # Add text
         draw.text((15, 15), stats_text, font=font, fill=(255, 255, 255))
     
+    # Create a detection table for display
     detection_table = pd.DataFrame(detections) if detections else pd.DataFrame(columns=["Object", "Confidence", "Position", "Dimensions"])
     
     return annotated_image, detection_table, stats_text, license_plate_gallery, download_files
