@@ -14,10 +14,18 @@ from datetime import datetime
 try:
     from license_plate_ocr import extract_license_plate_text
     OCR_AVAILABLE = True
-    print("OCR module loaded successfully")
+    print("Basic OCR module loaded successfully")
 except ImportError as e:
-    print(f"OCR module not available: {e}")
+    print(f"Basic OCR module not available: {e}")
     OCR_AVAILABLE = False
+
+try:
+    from advanced_ocr import extract_license_plate_text_advanced, get_available_models, set_ocr_model
+    ADVANCED_OCR_AVAILABLE = True
+    print("Advanced OCR module loaded successfully")
+except ImportError as e:
+    print(f"Advanced OCR module not available: {e}")
+    ADVANCED_OCR_AVAILABLE = False
 
 torch.hub.download_url_to_file('https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-1.jpg?raw=true', 'sample_1.jpg')
 torch.hub.download_url_to_file('https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-2.jpg?raw=true', 'sample_2.jpg')
@@ -28,7 +36,7 @@ torch.hub.download_url_to_file('https://github.com/Janno1402/Helmet-License-Plat
 model = YOLO("best.pt")
 class_names = {0: 'With Helmet', 1: 'Without Helmet', 2: 'License Plate'}
 
-def crop_license_plates(image, detections, extract_text=False):
+def crop_license_plates(image, detections, extract_text=False, selected_model="auto"):
     cropped_plates = []
     
     try:
@@ -101,10 +109,18 @@ def crop_license_plates(image, detections, extract_text=False):
                 'text': 'Processing...'
             }
             
-            if extract_text and OCR_AVAILABLE:
+            if extract_text and (OCR_AVAILABLE or ADVANCED_OCR_AVAILABLE):
                 try:
-                    print(f"Extracting text from license plate {i+1}...")
-                    plate_text = extract_license_plate_text(cropped_plate)
+                    print(f"Extracting text from license plate {i+1} using {selected_ocr_model}...")
+                    
+                    if ADVANCED_OCR_AVAILABLE and selected_ocr_model != "basic":
+                        if selected_ocr_model != "auto":
+                            set_ocr_model(selected_ocr_model)
+                        plate_text = extract_license_plate_text_advanced(cropped_plate, 
+                                    None if selected_ocr_model == "auto" else selected_ocr_model)
+                    else:
+                        plate_text = extract_license_plate_text(cropped_plate)
+                    
                     if plate_text and plate_text.strip() and not plate_text.startswith('Error'):
                         plate_data['text'] = plate_text.strip()
                         print(f"Extracted text: {plate_text.strip()}")
@@ -114,7 +130,7 @@ def crop_license_plates(image, detections, extract_text=False):
                 except Exception as e:
                     print(f"OCR extraction failed for plate {i+1}: {e}")
                     plate_data['text'] = f'OCR Failed: {str(e)}'
-            elif extract_text and not OCR_AVAILABLE:
+            elif extract_text and not (OCR_AVAILABLE or ADVANCED_OCR_AVAILABLE):
                 plate_data['text'] = 'OCR not available'
             else:
                 plate_data['text'] = 'OCR disabled'
@@ -204,7 +220,8 @@ def yoloV8_func(
     show_confidence=True,
     crop_plates=True,
     extract_text=False,
-    ocr_on_no_helmet=False
+    ocr_on_no_helmet=False,
+    selected_ocr_model="auto"
 ):
     if image_size is None:
         image_size = 640
@@ -245,6 +262,7 @@ def yoloV8_func(
     
     has_no_helmet = any(detection['Object'] == 'Without Helmet' for detection in detections)
     should_extract_text = extract_text or (ocr_on_no_helmet and has_no_helmet)
+    ocr_available = OCR_AVAILABLE or ADVANCED_OCR_AVAILABLE
     
     if crop_plates and detections:
         try:
@@ -254,12 +272,12 @@ def yoloV8_func(
             if ocr_on_no_helmet and has_no_helmet:
                 print("⚠️  No helmet detected - OCR will be performed on license plates")
             
-            cropped_plates = crop_license_plates(image, detections, should_extract_text)
+            cropped_plates = crop_license_plates(image, detections, should_extract_text, selected_ocr_model)
             print(f"Successfully cropped {len(cropped_plates)} license plates")
             
             license_plate_gallery = [plate_data['image'] for plate_data in cropped_plates]
             
-            if should_extract_text and OCR_AVAILABLE:
+            if should_extract_text and ocr_available:
                 print("Extracting text from license plates...")
                 plate_texts = []
                 for i, plate_data in enumerate(cropped_plates):
@@ -269,7 +287,7 @@ def yoloV8_func(
                         plate_texts.append(f"🚨 No Helmet Violation - Plate {i+1}: {text}")
                     else:
                         plate_texts.append(f"Plate {i+1}: {text}")
-            elif should_extract_text and not OCR_AVAILABLE:
+            elif should_extract_text and not ocr_available:
                 plate_texts = ["OCR not available - install requirements: pip install transformers easyocr"]
             elif not should_extract_text:
                 if ocr_on_no_helmet and not has_no_helmet:
@@ -361,7 +379,9 @@ with gr.Blocks(css=custom_css, title="YOLOv11 Motorcyclist Helmet Detection") as
         <p>This application uses YOLOv11 to detect Motorcyclists with and without Helmets in images.</p>
         <p>Upload an image, adjust the parameters, and view the detection results with detailed statistics.</p>
         <p><strong>Features:</strong> License plate cropping and optional text recognition!</p>
-        <p><strong>OCR Status:</strong> {'✅ Available' if OCR_AVAILABLE else '❌ Not Available (install requirements)'}</p>
+        <p><strong>OCR Status:</strong> 
+        {'✅ Advanced OCR Available' if ADVANCED_OCR_AVAILABLE else '🟡 Basic OCR Available' if OCR_AVAILABLE else '❌ OCR Not Available (install requirements)'}
+        </p>
     </div>
     """)
     
@@ -379,13 +399,31 @@ with gr.Blocks(css=custom_css, title="YOLOv11 Motorcyclist Helmet Detection") as
             gr.Markdown("### License Plate Options")
             crop_plates = gr.Checkbox(value=True, label="Crop License Plates")
             
-            if OCR_AVAILABLE:
+            ocr_available = OCR_AVAILABLE or ADVANCED_OCR_AVAILABLE
+            if ocr_available:
                 extract_text = gr.Checkbox(value=False, label="Extract Text from License Plates (OCR)")
                 ocr_on_no_helmet = gr.Checkbox(value=True, label="🚨 Auto-OCR when No Helmet Detected")
+                
+                if ADVANCED_OCR_AVAILABLE:
+                    models = get_available_models()
+                    model_choices = [("Auto (Recommended)", "auto"), ("Basic EasyOCR", "basic")]
+                    for key, info in models.items():
+                        model_choices.append((info["name"], key))
+                    
+                    selected_ocr_model = gr.Dropdown(
+                        choices=model_choices,
+                        value="auto",
+                        label="OCR Model Selection",
+                        info="Choose OCR model (Advanced models require additional setup)"
+                    )
+                else:
+                    selected_ocr_model = gr.State("basic")
+                
                 gr.Markdown("*Note: OCR processing may take additional time*")
             else:
                 extract_text = gr.Checkbox(value=False, label="Extract Text (OCR Not Available)", interactive=False)
                 ocr_on_no_helmet = gr.Checkbox(value=False, label="🚨 Auto-OCR when No Helmet (Not Available)", interactive=False)
+                selected_ocr_model = gr.State("basic")
                 gr.Markdown("*Install requirements: `pip install torch transformers easyocr opencv-python`*")
             
             submit_btn = gr.Button("Detect Objects", variant="primary")
@@ -450,7 +488,7 @@ with gr.Blocks(css=custom_css, title="YOLOv11 Motorcyclist Helmet Detection") as
     
     submit_btn.click(
         fn=yoloV8_func,
-        inputs=[input_image, image_size, conf_threshold, iou_threshold, show_stats, gr.State(True), crop_plates, extract_text, ocr_on_no_helmet],
+        inputs=[input_image, image_size, conf_threshold, iou_threshold, show_stats, gr.State(True), crop_plates, extract_text, ocr_on_no_helmet, selected_ocr_model],
         outputs=[output_image, output_table, output_stats, license_gallery, download_file, plate_text_output]
     )
     
