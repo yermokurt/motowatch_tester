@@ -565,7 +565,18 @@ with gr.Blocks(
                     </div>
                 """)
                 
-                examples=[["sample_1.jpg"], ["sample_2.jpg"], ["sample_3.jpg"], ["sample_4.jpg"], ["sample_5.jpg"],["sample_6.jpg"], ["sample_7.jpg"], ["sample_8.jpg"]], inputs=input_image,
+                gr.Examples(
+                    examples=[
+                        ["sample_1.jpg"], 
+                        ["sample_2.jpg"], 
+                        ["sample_3.jpg"], 
+                        ["sample_4.jpg"], 
+                        ["sample_6.jpg"].
+                        ["sample_7.jpg"],
+                        ["sample_8.jpg"],
+                    
+                    ],
+                    inputs=input_image,
                     outputs=[
                         output_image,
                         output_table,
