@@ -394,6 +394,18 @@ def download_sample_images():
         "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-5.jpg?raw=true",
         "sample_5.jpg",
     )
+    torch.hub.download_url_to_file(
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-6.jpg?raw=true",
+        "sample_6.jpg",
+    )
+    torch.hub.download_url_to_file(
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-7.jpg?raw=true",
+        "sample_7.jpg",
+    )
+    torch.hub.download_url_to_file(
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-8.jpg?raw=true",
+        "sample_8.jpg",
+    )
 
 
 def get_ocr_status():
