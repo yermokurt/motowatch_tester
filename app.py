@@ -571,7 +571,7 @@ with gr.Blocks(
                         ["sample_2.jpg"], 
                         ["sample_3.jpg"], 
                         ["sample_4.jpg"], 
-                        ["sample_6.jpg"].
+                        ["sample_6.jpg"],
                         ["sample_7.jpg"],
                         ["sample_8.jpg"],
                     
