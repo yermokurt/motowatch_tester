@@ -375,23 +375,23 @@ def yolov8_detect(
 def download_sample_images():
     """Download sample images for testing."""
     torch.hub.download_url_to_file(
-        "https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-1.jpg?raw=true",
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-1.jpg?raw=true",
         "sample_1.jpg",
     )
     torch.hub.download_url_to_file(
-        "https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-2.jpg?raw=true",
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-2.jpg?raw=true",
         "sample_2.jpg",
     )
     torch.hub.download_url_to_file(
-        "https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-3.jpg?raw=true",
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-3.jpg?raw=true",
         "sample_3.jpg",
     )
     torch.hub.download_url_to_file(
-        "https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-4.jpg?raw=true",
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-4.jpg?raw=true",
         "sample_4.jpg",
     )
     torch.hub.download_url_to_file(
-        "https://github.com/Janno1402/Helmet-License-Plate-Detection/blob/main/Sample-Image-5.jpg?raw=true",
+        "https://github.com/Abs6187/Helmet-Detection/blob/main/Sample-Image-5.jpg?raw=true",
         "sample_5.jpg",
     )
 
