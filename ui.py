@@ -206,7 +206,7 @@ class UIComponents:
     def create_examples_tab(self, input_image, output_components):
         with gr.TabItem("Examples"):
             gr.Markdown("### Sample Images")
-            gr.Markdown("Click any example to test the detection system:")
+            gr.Markdown("Click any example to load it, then click 'Start Detection':")
             
             gr.Examples(
                 examples=[
@@ -219,18 +219,6 @@ class UIComponents:
                     ["Sample-Image-8.jpg"],
                 ],
                 inputs=input_image,
-                outputs=[
-                    output_components['output_image'],
-                    output_components['output_table'],
-                    output_components['output_stats'],
-                    output_components['license_gallery'],
-                    output_components['download_file'],
-                    output_components['plate_text_output'],
-                ],
-                fn=lambda img: yolov8_detect(
-                    img, 640, 0.4, 0.5, True, True, True, False
-                ),
-                cache_examples=True
             )
 
     def create_info_tab(self):
