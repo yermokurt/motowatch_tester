@@ -210,13 +210,13 @@ class UIComponents:
             
             gr.Examples(
                 examples=[
-                    ["sample_1.jpg"], 
-                    ["sample_2.jpg"], 
-                    ["sample_3.jpg"], 
-                    ["sample_4.jpg"], 
-                    ["sample_6.jpg"],
-                    ["sample_7.jpg"],
-                    ["sample_8.jpg"],
+                    ["Sample-Image-1.jpg"], 
+                    ["Sample-Image-2.jpg"], 
+                    ["Sample-Image-3.jpg"], 
+                    ["Sample-Image-4.jpg"], 
+                    ["Sample-Image-6.jpg"],
+                    ["Sample-Image-7.jpg"],
+                    ["Sample-Image-8.jpg"],
                 ],
                 inputs=input_image,
                 outputs=[
