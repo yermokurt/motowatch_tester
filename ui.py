@@ -15,7 +15,13 @@ except ImportError:
 
 class UIComponents:
     def __init__(self):
-        download_sample_images()
+        # Wrap download_sample_images in try-except to prevent app crash
+        try:
+            download_sample_images()
+        except Exception as e:
+            print(f"Warning: Could not download sample images: {e}")
+            print("Continuing without sample images...")
+        
         self.ocr_status = get_ocr_status()
         self.custom_css = """
 .gradio-container {
