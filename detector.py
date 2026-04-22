@@ -278,6 +278,7 @@ def yolov8_video_detect(
     image_size=640,
     conf_threshold=0.3,
     iou_threshold=0.3,
+    frame_skip=2  # Process every Nth frame
 ):
     if not video_path:
         return None, "No video provided"
@@ -315,57 +316,68 @@ def yolov8_video_detect(
         return None, "Error: Could not initialize any video codec on this system."
 
     imgsz = [image_size, image_size]
+    frame_count = 0
+    annotated_frame = None
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
+        
+        # Only run detection every Nth frame
+        if frame_count % frame_skip == 0:
+            h_res = helmet_model.predict(frame, conf=conf_threshold, iou=iou_threshold, imgsz=imgsz, verbose=False, half=True)
+            p_res = plate_model.predict(frame, conf=conf_threshold, iou=iou_threshold, imgsz=imgsz, verbose=False, half=True)
+            m_res = motorcycle_model.predict(frame, conf=conf_threshold, iou=iou_threshold, imgsz=imgsz, verbose=False, half=True)
 
-        h_res = helmet_model.predict(frame, conf=conf_threshold, iou=iou_threshold, imgsz=imgsz, verbose=False, half=True)
-        p_res = plate_model.predict(frame, conf=conf_threshold, iou=iou_threshold, imgsz=imgsz, verbose=False, half=True)
-        m_res = motorcycle_model.predict(frame, conf=conf_threshold, iou=iou_threshold, imgsz=imgsz, verbose=False, half=True)
-
-        annotated_frame = frame.copy()
-
-        # Draw Helmet Detections (best1.pt)
-        if h_res[0].boxes is not None:
-            for box, cls, conf in zip(h_res[0].boxes.xyxy, h_res[0].boxes.cls, h_res[0].boxes.conf):
-                x1, y1, x2, y2 = map(int, box.tolist())
-                raw_label = helmet_model.names[int(cls)]
-                label = label_map.get(raw_label, raw_label)
-                color = (0, 255, 0) if label == "Compliant" else (0, 0, 255)
-                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(annotated_frame, f"{label} {conf:.2f}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-        # Draw Plate Detections
-        if p_res[0].boxes is not None:
-            for box, cls, conf in zip(p_res[0].boxes.xyxy, p_res[0].boxes.cls, p_res[0].boxes.conf):
-                x1, y1, x2, y2 = map(int, box.tolist())
-                class_id = int(cls)
-                if class_id == 0: # License Plate
-                    color = (255, 0, 0)
-                    label = "License Plate"
-                else:
-                    continue
-                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(annotated_frame, f"{label} {conf:.2f}", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-        # Draw Motorcycle Detections
-        if m_res[0].boxes is not None:
-            for box, cls, conf in zip(m_res[0].boxes.xyxy, m_res[0].boxes.cls, m_res[0].boxes.conf):
-                if int(cls) == 2: # motorcyclist
+            annotated_frame = frame.copy()
+            
+            # Draw Helmet Detections (best1.pt)
+            if h_res[0].boxes is not None:
+                for box, cls, conf in zip(h_res[0].boxes.xyxy, h_res[0].boxes.cls, h_res[0].boxes.conf):
                     x1, y1, x2, y2 = map(int, box.tolist())
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
-                    cv2.putText(annotated_frame, f"Motorcycle {conf:.2f}", (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 165, 0), 2)
+                    raw_label = helmet_model.names[int(cls)]
+                    label = label_map.get(raw_label, raw_label)
+                    color = (0, 255, 0) if label == "Compliant" else (0, 0, 255)
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(annotated_frame, f"{label} {conf:.2f}", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-        out.write(annotated_frame)
+            # Draw Plate Detections
+            if p_res[0].boxes is not None:
+                for box, cls, conf in zip(p_res[0].boxes.xyxy, p_res[0].boxes.cls, p_res[0].boxes.conf):
+                    x1, y1, x2, y2 = map(int, box.tolist())
+                    class_id = int(cls)
+                    if class_id == 0: # License Plate
+                        color = (255, 0, 0)
+                        label = "License Plate"
+                    else:
+                        continue
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(annotated_frame, f"{label} {conf:.2f}", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+            # Draw Motorcycle Detections
+            if m_res[0].boxes is not None:
+                for box, cls, conf in zip(m_res[0].boxes.xyxy, m_res[0].boxes.cls, m_res[0].boxes.conf):
+                    if int(cls) == 2: # motorcyclist
+                        x1, y1, x2, y2 = map(int, box.tolist())
+                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (255, 165, 0), 2)
+                        cv2.putText(annotated_frame, f"Motorcycle {conf:.2f}", (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 165, 0), 2)
+
+        # If we skipped this frame's detection, we write the raw frame or the last known annotated frame
+        # To avoid "frozen" boxes, we'll write the raw frame for skipped frames
+        if frame_count % frame_skip == 0:
+            out.write(annotated_frame)
+        else:
+            out.write(frame)
+
+        frame_count += 1
 
     cap.release()
     out.release()
-    return output_path, f"Processed {total_frames} frames."
+    return output_path, f"Processed {total_frames} frames (Skipped {frame_skip-1} frames between each detection)."
 
 def download_sample_images():
     import torch
