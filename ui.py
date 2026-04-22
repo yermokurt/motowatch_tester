@@ -99,8 +99,9 @@ class UIComponents:
             with gr.Row():
                 with gr.Column(scale=1):
                     components['video_input'] = gr.Video(label="Upload Video")
-                    components['video_image_size'] = gr.Slider(320, 1280, 640, step=32, label="Process Size")
+                    components['video_image_size'] = gr.Slider(160, 1280, 320, step=32, label="Process Size (Lower = Faster)")
                     components['video_conf'] = gr.Slider(0.0, 1.0, 0.4, step=0.05, label="Confidence")
+                    components['video_frame_skip'] = gr.Slider(1, 10, 5, step=1, label="Frame Skip (Higher = Faster)")
                     components['video_submit'] = gr.Button("Start Video Processing", variant="primary")
                     components['video_back'] = gr.Button("← Back to Home", size="sm")
                 with gr.Column(scale=2):
