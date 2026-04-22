@@ -111,8 +111,9 @@ class UIComponents:
     def create_settings_panel(self):
         components = {}
         components['input_image'] = gr.Image(type="filepath", label="Upload Image")
-        components['image_size'] = gr.Slider(320, 1280, 640, step=32, label="Image Size")
-        components['conf_threshold'] = gr.Slider(0.0, 1.0, 0.4, step=0.05, label="Confidence")
+        with gr.Row():
+            components['image_size'] = gr.Slider(minimum=160, maximum=1280, step=32, value=320, label="Process Size (Lower = Faster)")
+            components['conf_threshold'] = gr.Slider(minimum=0.0, maximum=1.0, step=0.05, value=0.4, label="Confidence")
         components['iou_threshold'] = gr.Slider(0.0, 1.0, 0.5, step=0.05, label="IoU Threshold")
         components['show_stats'] = gr.Checkbox(value=True, label="Show Statistics")
         components['crop_plates'] = gr.Checkbox(value=True, label="Extract License Plates")

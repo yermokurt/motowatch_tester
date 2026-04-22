@@ -275,10 +275,10 @@ def yolov8_detect(
 
 def yolov8_video_detect(
     video_path,
-    image_size=640,
+    image_size=320, # Reduced for CPU speed
     conf_threshold=0.3,
     iou_threshold=0.3,
-    frame_skip=2  # Process every Nth frame
+    frame_skip=5  # Increased for CPU speed (Process every 5th frame)
 ):
     if not video_path:
         return None, "No video provided"
@@ -295,8 +295,8 @@ def yolov8_video_detect(
     output_filename = f"processed_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
     output_path = os.path.join(os.getcwd(), output_filename)
     
-    # Try different codecs for maximum compatibility and robustness
-    codecs = ['avc1', 'X264', 'mp4v', 'XVID']
+    # Try different codecs (mp4v is often more reliable on CPU/Windows without DLLs)
+    codecs = ['mp4v', 'avc1', 'X264', 'XVID']
     out = None
     
     for codec in codecs:
