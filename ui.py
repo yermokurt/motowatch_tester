@@ -173,6 +173,6 @@ class UIComponents:
 
         vid_comps['video_submit'].click(
             fn=yolov8_video_detect,
-            inputs=[vid_comps['video_input'], vid_comps['video_image_size'], vid_comps['video_conf']],
+            inputs=[vid_comps['video_input'], vid_comps['video_image_size'], vid_comps['video_conf'], gr.State(0.3), vid_comps['video_frame_skip']],
             outputs=[vid_comps['video_output'], vid_comps['video_status']]
         )
