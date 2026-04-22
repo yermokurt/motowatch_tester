@@ -1,6 +1,7 @@
 import gradio as gr
 from detector import (
     yolov8_detect,
+    yolov8_video_detect,
     download_sample_images,
     get_ocr_status,
     ADVANCED_OCR_AVAILABLE,
@@ -15,273 +16,161 @@ except ImportError:
 
 class UIComponents:
     def __init__(self):
-        # Wrap download_sample_images in try-except to prevent app crash
         try:
             download_sample_images()
         except Exception as e:
             print(f"Warning: Could not download sample images: {e}")
-            print("Continuing without sample images...")
         
         self.ocr_status = get_ocr_status()
         self.custom_css = """
 .gradio-container {
     max-width: 1200px !important;
     margin: 0 auto;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
-.main-header {
+.landing-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 70vh;
+    gap: 2rem;
+    padding: 2rem;
+}
+.landing-title {
+    font-size: 3.5rem;
+    font-weight: 800;
     text-align: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
-.main-title {
-    font-size: 2rem;
-    font-weight: 600;
-    color: #333;
-    margin: 0;
+.landing-subtitle {
+    font-size: 1.2rem;
+    color: #64748b;
+    text-align: center;
+    max-width: 600px;
+    margin-bottom: 3rem;
 }
-.subtitle {
-    color: #666;
-    font-size: 1rem;
-    margin: 0.5rem 0;
+.selection-box {
+    display: flex;
+    gap: 2rem;
 }
-.status-info {
-    font-size: 0.9rem;
-    color: #888;
-    margin: 0.5rem 0;
-}
-.section-gap {
-    margin: 1.5rem 0;
+.nav-btn {
+    padding: 2rem !important;
+    font-size: 1.5rem !important;
+    height: auto !important;
+    width: 280px !important;
 }
 """
 
-    def toggle_sections(self, extract_text_checked, crop_checked):
-        show_gallery = bool(extract_text_checked and crop_checked)
-        show_ocr = bool(extract_text_checked)
-        return (
-            gr.update(visible=show_gallery),
-            gr.update(visible=show_ocr),
-        )
-
     def get_ocr_status_text(self):
-        if ADVANCED_OCR_AVAILABLE:
-            return "Advanced OCR Available"
-        elif OCR_AVAILABLE:
-            return "Basic OCR Available"
-        else:
-            return "OCR Not Available"
+        if ADVANCED_OCR_AVAILABLE: return "Advanced OCR Available"
+        if OCR_AVAILABLE: return "Basic OCR Available"
+        return "OCR Not Available"
 
-    def create_header(self):
-        return gr.HTML(f"""
-            <div class="main-header">
-                <h1 class="main-title">AI Helmet Detection System</h1>
-                <p class="subtitle">Motorcyclist safety monitoring with license plate recognition</p>
-                <p class="status-info">YOLOv11 • {self.get_ocr_status_text()} • Real-time Processing</p>
-            </div>
-        """)
+    def create_landing_page(self):
+        with gr.Column(elem_classes="landing-container", visible=True) as landing_page:
+            gr.HTML("""
+                <h1 class="landing-title">AI Safety Guardian</h1>
+                <p class="landing-subtitle">Intelligent Motorcyclist Compliance & License Plate Recognition System</p>
+            """)
+            with gr.Row(elem_classes="selection-box"):
+                image_btn = gr.Button("🖼️ Check Image", elem_classes="nav-btn", variant="primary")
+                video_btn = gr.Button("🎥 Check Video", elem_classes="nav-btn", variant="secondary")
+        return landing_page, image_btn, video_btn
+
+    def create_image_panel(self):
+        with gr.Column(visible=False) as image_panel:
+            gr.Markdown("# 🖼️ Image Detection")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    components = self.create_settings_panel()
+                    components['back_btn'] = gr.Button("← Back to Home", size="sm")
+                with gr.Column(scale=2):
+                    results = self.create_results_panel()
+        return image_panel, components, results
+
+    def create_video_panel(self):
+        components = {}
+        with gr.Column(visible=False) as video_panel:
+            gr.Markdown("# 🎥 Video Detection")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    components['video_input'] = gr.Video(label="Upload Video")
+                    components['video_image_size'] = gr.Slider(320, 1280, 640, step=32, label="Process Size")
+                    components['video_conf'] = gr.Slider(0.0, 1.0, 0.4, step=0.05, label="Confidence")
+                    components['video_submit'] = gr.Button("Start Video Processing", variant="primary")
+                    components['video_back'] = gr.Button("← Back to Home", size="sm")
+                with gr.Column(scale=2):
+                    components['video_output'] = gr.Video(label="Processed Result")
+                    components['video_status'] = gr.Textbox(label="Status", interactive=False)
+        return video_panel, components
 
     def create_settings_panel(self):
         components = {}
+        components['input_image'] = gr.Image(type="filepath", label="Upload Image")
+        components['image_size'] = gr.Slider(320, 1280, 640, step=32, label="Image Size")
+        components['conf_threshold'] = gr.Slider(0.0, 1.0, 0.4, step=0.05, label="Confidence")
+        components['iou_threshold'] = gr.Slider(0.0, 1.0, 0.5, step=0.05, label="IoU Threshold")
+        components['show_stats'] = gr.Checkbox(value=True, label="Show Statistics")
+        components['crop_plates'] = gr.Checkbox(value=True, label="Extract License Plates")
+        components['extract_text'] = gr.Checkbox(value=False, label="Enable OCR")
+        components['ocr_on_no_helmet'] = gr.Checkbox(value=True, label="Auto-OCR for No Helmet")
         
-        with gr.Column(scale=1):
-            gr.Markdown("### Settings")
+        if ADVANCED_OCR_AVAILABLE:
+            models = get_available_models()
+            choices = [("Auto", "auto"), ("Basic", "basic")] + [(info['name'], k) for k, info in models.items()]
+            components['selected_ocr_model'] = gr.Dropdown(choices=choices, value="auto", label="OCR Model")
+        else:
+            components['selected_ocr_model'] = gr.State("basic")
             
-            components['input_image'] = gr.Image(
-                type="filepath", 
-                label="Upload Image", 
-                sources=["upload", "webcam"]
-            )
-            
-            with gr.Row():
-                components['image_size'] = gr.Slider(
-                    minimum=320, maximum=1280, value=640, step=32,
-                    label="Image Size"
-                )
-            
-            with gr.Row():
-                components['conf_threshold'] = gr.Slider(
-                    minimum=0.0, maximum=1.0, value=0.4, step=0.05,
-                    label="Confidence"
-                )
-                components['iou_threshold'] = gr.Slider(
-                    minimum=0.0, maximum=1.0, value=0.5, step=0.05,
-                    label="IoU Threshold"
-                )
-            
-            components['show_stats'] = gr.Checkbox(
-                value=True, 
-                label="Show Statistics"
-            )
-            components['crop_plates'] = gr.Checkbox(
-                value=True, 
-                label="Extract License Plates"
-            )
-            
-            if self.ocr_status["any_available"]:
-                components['extract_text'] = gr.Checkbox(
-                    value=False,
-                    label="Enable OCR"
-                )
-                components['ocr_on_no_helmet'] = gr.Checkbox(
-                    value=True,
-                    label="Auto-OCR for No Helmet"
-                )
-
-                if ADVANCED_OCR_AVAILABLE:
-                    models = get_available_models()
-                    model_choices = [("Auto (Recommended)", "auto"), ("Basic EasyOCR", "basic")]
-                    for key, info in models.items():
-                        model_choices.append((info['name'], key))
-                    components['selected_ocr_model'] = gr.Dropdown(
-                        choices=model_choices,
-                        value="auto",
-                        label="OCR Model"
-                    )
-                else:
-                    components['selected_ocr_model'] = gr.State("basic")
-
-                gr.Markdown("*Note: OCR processing may increase detection time.*")
-            else:
-                components['extract_text'] = gr.Checkbox(
-                    value=False,
-                    label="OCR Not Available",
-                    interactive=False
-                )
-                components['ocr_on_no_helmet'] = gr.Checkbox(
-                    value=False,
-                    label="Auto-OCR (Not Available)",
-                    interactive=False
-                )
-                components['selected_ocr_model'] = gr.State("basic")
-            
-            with gr.Row():
-                components['submit_btn'] = gr.Button("Start Detection", variant="primary")
-                components['clear_btn'] = gr.Button("Clear")
-        
+        with gr.Row():
+            components['submit_btn'] = gr.Button("Start Detection", variant="primary")
+            components['clear_btn'] = gr.Button("Clear")
         return components
 
     def create_results_panel(self):
         components = {}
-        
-        with gr.Column(scale=2):
-            gr.Markdown("### Results")
-            
-            components['output_image'] = gr.Image(
-                type="pil", 
-                label="Detection Results"
-            )
-            
-            with gr.Row():
-                components['output_table'] = gr.Dataframe(
-                    headers=["Object", "Confidence", "Position", "Dimensions"],
-                    label="Detection Details",
-                    interactive=False
-                )
-                components['output_stats'] = gr.Textbox(
-                    label="Statistics",
-                    interactive=False,
-                    lines=6
-                )
-
-            components['license_gallery'] = gr.Gallery(
-                label="License Plates",
-                columns=3,
-                visible=False
-            )
-
-            components['ocr_group'] = gr.Group(visible=False)
-            with components['ocr_group']:
-                components['plate_text_output'] = gr.Textbox(
-                    label="OCR Results",
-                    lines=4,
-                    interactive=False
-                )
-
-            components['download_file'] = gr.File(
-                label="Download Results (ZIP)",
-                interactive=False
-            )
-        
+        components['output_image'] = gr.Image(type="pil", label="Results")
+        with gr.Row():
+            components['output_table'] = gr.Dataframe(headers=["Object", "Confidence", "Position", "Dimensions"], label="Details")
+            components['output_stats'] = gr.Textbox(label="Stats", lines=6)
+        components['license_gallery'] = gr.Gallery(label="Extracted Plates", columns=3, height="auto")
+        components['ocr_group'] = gr.Group()
+        with components['ocr_group']:
+            components['plate_text_output'] = gr.Textbox(label="OCR Text Log", lines=4)
+        components['download_file'] = gr.File(label="Archive (Optional)", visible=False)
         return components
 
-    def create_examples_tab(self, input_image, output_components):
-        with gr.TabItem("Examples"):
-            gr.Markdown("### Sample Images")
-            gr.Markdown("Click any example to load it, then click 'Start Detection':")
-            
-            gr.Examples(
-                examples=[
-                    ["Sample-Image-1.jpg"], 
-                    ["Sample-Image-2.jpg"], 
-                    ["Sample-Image-3.jpg"], 
-                    ["Sample-Image-4.jpg"], 
-                    ["Sample-Image-6.jpg"],
-                    ["Sample-Image-7.jpg"],
-                    ["Sample-Image-8.jpg"],
-                ],
-                inputs=input_image,
-            )
+    def setup_event_handlers(self, landing_page, image_panel, video_panel, img_comps, vid_comps, image_btn, video_btn):
+        # Navigation logic
+        image_btn.click(lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)), 
+                        None, [landing_page, image_panel, video_panel])
+        video_btn.click(lambda: (gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)), 
+                        None, [landing_page, image_panel, video_panel])
+        img_comps['back_btn'].click(lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)), 
+                                    None, [landing_page, image_panel, video_panel])
+        vid_comps['video_back'].click(lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)), 
+                                      None, [landing_page, image_panel, video_panel])
 
-    def create_info_tab(self):
-        with gr.TabItem("Info"):
-            gr.Markdown("### System Information")
-            
-            gr.Markdown(f"""
-            **AI Model:** YOLOv11  
-            **Classes:** Helmet, No Helmet, License Plate  
-            **OCR Status:** {self.get_ocr_status_text()}  
-            **Features:** Detection, extraction, text recognition  
-            
-            **Privacy:** All processing is local. No data stored.  
-            **Usage:** For demonstration and research purposes only.
-            """)
-
-    def setup_event_handlers(self, settings_components, results_components):
-        settings_components['submit_btn'].click(
+        img_comps['submit_btn'].click(
             fn=yolov8_detect,
             inputs=[
-                settings_components['input_image'],
-                settings_components['image_size'],
-                settings_components['conf_threshold'],
-                settings_components['iou_threshold'],
-                settings_components['show_stats'],
-                gr.State(True),
-                settings_components['crop_plates'],
-                settings_components['extract_text'],
-                settings_components['ocr_on_no_helmet'],
-                settings_components['selected_ocr_model'],
+                img_comps['input_image'], img_comps['image_size'], img_comps['conf_threshold'], 
+                img_comps['iou_threshold'], img_comps['show_stats'], gr.State(True), 
+                img_comps['crop_plates'], img_comps['extract_text'], img_comps['ocr_on_no_helmet'], 
+                img_comps['selected_ocr_model']
             ],
             outputs=[
-                results_components['output_image'],
-                results_components['output_table'],
-                results_components['output_stats'],
-                results_components['license_gallery'],
-                results_components['download_file'],
-                results_components['plate_text_output'],
-            ],
+                img_comps['output_image'], img_comps['output_table'], img_comps['output_stats'], 
+                img_comps['license_gallery'], img_comps['download_file'], img_comps['plate_text_output']
+            ]
         )
 
-        settings_components['clear_btn'].click(
-            fn=lambda: [None, None, None, None, None, None],
-            inputs=[],
-            outputs=[
-                settings_components['input_image'],
-                results_components['output_image'],
-                results_components['output_table'],
-                results_components['output_stats'],
-                results_components['license_gallery'],
-                results_components['download_file'],
-                results_components['plate_text_output'],
-            ],
-        )
-
-        settings_components['extract_text'].change(
-            fn=self.toggle_sections,
-            inputs=[settings_components['extract_text'], settings_components['crop_plates']],
-            outputs=[results_components['license_gallery'], results_components['ocr_group']],
-        )
-        
-        settings_components['crop_plates'].change(
-            fn=self.toggle_sections,
-            inputs=[settings_components['extract_text'], settings_components['crop_plates']],
-            outputs=[results_components['license_gallery'], results_components['ocr_group']],
+        vid_comps['video_submit'].click(
+            fn=yolov8_video_detect,
+            inputs=[vid_comps['video_input'], vid_comps['video_image_size'], vid_comps['video_conf']],
+            outputs=[vid_comps['video_output'], vid_comps['video_status']]
         )

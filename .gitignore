@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Gradio files
+.gradio/
+
+# Detection results
+plates_*.zip
+processed_*.mp4
+
+# Environment
+env/
+venv/
+.env
+
+# OS generated files
+.DS_Store
+Thumbs.db
